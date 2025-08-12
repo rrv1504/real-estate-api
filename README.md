@@ -94,7 +94,7 @@ A comprehensive Real Estate API built with Node.js, Express, and MongoDB that pr
 
 ## API Documentation
 
-For complete API documentation including all endpoints, request/response examples, and authentication details, please refer to the [API Documentation](http://localhost:8000/api/api-docs).
+For complete API documentation including all endpoints, request/response examples, and authentication details, please refer to the [API Documentation](http://localhost:8000/api-docs).
 
 The API documentation covers:
 - Authentication endpoints
