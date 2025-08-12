@@ -247,9 +247,9 @@ export const readAdSell = async (req, res) => {
 
     for (const ad of ads) {
       incrementViewCount(ad._id);
+      ad.save();
     }
 
-    ads.save();
 
     res.status(200).json({
       success: true,
@@ -290,9 +290,9 @@ export const readAdRent = async (req, res) => {
 
     for (const ad of ads) {
       incrementViewCount(ad._id);
+      ad.save();
     }
 
-    ads.save();
 
     res.status(200).json({
       success: true,
