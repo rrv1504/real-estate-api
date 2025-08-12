@@ -4,7 +4,7 @@ import User from '../models/User.js';
 import { hashPassword, comparePassword } from '../helpers/authHelper.js';
 import jwt from 'jsonwebtoken';
 import { nanoid } from 'nanoid';
-    
+
 // REGISTER CONTROLLER
 export const register = async (req, res) => {
     const { username, name, address, phone, email, password, role,logo,photo } = req.body;
@@ -147,6 +147,7 @@ export const forgotPassword = async (req, res) => {
 export const currentUser = async (req,res) => {
     try {
         const user = await User.findById(req.user._id);
+        console.log("User : "+ user);
         user.password = undefined; // Exclude password from response
         res.status(200).json({
             success: true,
