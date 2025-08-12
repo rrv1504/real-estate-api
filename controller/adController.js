@@ -5,7 +5,7 @@ import { geoCodeAddress } from '../helpers/geocoder.js';
 import { OtpService } from '../helpers/email.js';
 import slugify from 'slugify';
 import Ad from '../models/ad.js';
-import User from '../models/user.js';
+import User from '../models/User.js';
 import { incrementViewCount } from '../helpers/ad.js';
 
 export const uploadImage = async (req, res) => {

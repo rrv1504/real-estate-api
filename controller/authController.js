@@ -1,10 +1,10 @@
 import { OtpService } from '../helpers/email.js';
 import emailValidator from 'email-validator';
-import User from '../models/user.js';
+import User from '../models/User.js';
 import { hashPassword, comparePassword } from '../helpers/authHelper.js';
 import jwt from 'jsonwebtoken';
 import { nanoid } from 'nanoid';
-
+    
 // REGISTER CONTROLLER
 export const register = async (req, res) => {
     const { username, name, address, phone, email, password, role,logo,photo } = req.body;
