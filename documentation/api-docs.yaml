@@ -1,0 +1,1412 @@
+openapi: 3.0.3
+info:
+  title: Real Estate API
+  description: |
+    Comprehensive API for real estate property management system including user authentication, 
+    property listings, search functionality, and user interactions.
+    
+    ## Authentication
+    Most endpoints require JWT token authentication. Include the token in the Authorization header:
+    ```
+    Authorization: Bearer <your_jwt_token>
+    ```
+    
+    ## Rate Limiting
+    - 100 requests per 15 minutes per IP address
+    - Exceeding limit returns: "Too many requests from this IP, please try again after 15 minutes"
+    
+    ## Environment Variables Required
+    
+    The following environment variables must be configured for the API to function properly:
+    
+    ### Database Configuration
+    ```
+    DATABASE=mongodb_connection_string
+    ```
+    MongoDB connection string for database connectivity.
+    
+    ### JWT Authentication
+    ```
+    JWT_SECRET=your_jwt_secret
+    JWT_EXPIRATION=7d
+    ```
+    - `JWT_SECRET`: Secret key for signing JWT tokens (use a strong, random string)
+    - `JWT_EXPIRATION`: Token expiration time (e.g., 7d, 24h, 3600s)
+    
+    ### Cloudinary Configuration (Image Storage)
+    ```
+    CLOUDINARY_CLOUD_NAME=your_cloudinary_name
+    CLOUDINARY_API_KEY=your_cloudinary_key
+    CLOUDINARY_API_SECRET=your_cloudinary_secret
+    ```
+    Cloudinary credentials for image upload and storage functionality.
+    
+    ### Geocoding Service
+    ```
+    OPENCAGE_API_KEY=your_geocoding_api_key
+    ```
+    OpenCage API key for address geocoding and location-based search.
+    
+    ### Email Service (SMTP)
+    ```
+    SMTP_HOST=your_smtp_host
+    SMTP_PORT=your_smtp_port
+    SMTP_USER=your_smtp_username
+    SMTP_PASS=your_smtp_password
+    ```
+    SMTP configuration for sending emails (welcome emails, password resets, contact notifications).
+    
+    ### Example .env File
+    ```env
+    DATABASE=mongodb://localhost:27017/realestate
+    JWT_SECRET=your-super-secret-jwt-key-here
+    JWT_EXPIRATION=7d
+    CLOUDINARY_CLOUD_NAME=your-cloud-name
+    CLOUDINARY_API_KEY=123456789012345
+    CLOUDINARY_API_SECRET=your-cloudinary-secret
+    OPENCAGE_API_KEY=your-opencage-api-key
+    SMTP_HOST=smtp.gmail.com
+    SMTP_PORT=587
+    SMTP_USER=your-email@gmail.com
+    SMTP_PASS=your-app-password
+    ```
+    
+    ## Features
+    
+    - **User Management**: Registration, authentication, profile management
+    - **Property Listings**: CRUD operations for property advertisements
+    - **Image Management**: Upload/delete images via Cloudinary
+    - **Geospatial Search**: Location-based property search within radius
+    - **User Interactions**: Wishlist, enquiries, agent contact
+    - **Email Notifications**: Automated emails for various actions
+    - **Admin Panel**: Administrative controls for content management
+    - **Rate Limiting**: API protection against abuse
+    
+    ## Technical Stack
+    
+    - **Backend**: Node.js, Express.js
+    - **Database**: MongoDB with Mongoose ODM
+    - **Authentication**: JWT (JSON Web Tokens)
+    - **Image Storage**: Cloudinary
+    - **Email Service**: Nodemailer with SMTP
+    - **Geocoding**: OpenCage API
+    - **Security**: Helmet, CORS, Rate Limiting
+  version: 1.0.0
+  contact:
+    name: Real Estate API Support
+    email: support@realestate.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8000/api
+    description: Development server
+
+security:
+  - bearerAuth: []
+
+paths:
+  /:
+    get:
+      tags:
+        - Health Check
+      summary: API Health Check
+      description: Check if the API is running and get current server time
+      security: []
+      responses:
+        '200':
+          description: API is running
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "The current time is 3:45:30 PM"
+
+  /register:
+    post:
+      tags:
+        - Authentication
+      summary: Register new user
+      description: Create a new user account with email verification
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /login:
+    get:
+      tags:
+        - Authentication
+      summary: User login
+      description: Authenticate user and get JWT token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Incorrect password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /forgot-password:
+    post:
+      tags:
+        - Authentication
+      summary: Reset password
+      description: Send temporary password to user's email
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+              required:
+                - email
+      responses:
+        '200':
+          description: Password reset email sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /current-user:
+    get:
+      tags:
+        - Authentication
+      summary: Get current user
+      description: Retrieve current authenticated user details
+      responses:
+        '200':
+          description: User details retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  user:
+                    $ref: '#/components/schemas/User'
+
+  /update-password:
+    put:
+      tags:
+        - Authentication
+      summary: Update password
+      description: Change user password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  type: string
+                  minLength: 6
+                  example: "newpassword123"
+              required:
+                - password
+      responses:
+        '200':
+          description: Password updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Invalid password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /update-username:
+    put:
+      tags:
+        - Authentication
+      summary: Update username
+      description: Change user username
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  example: "new_username"
+              required:
+                - username
+      responses:
+        '200':
+          description: Username updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Username Updated Successfully"
+                  User:
+                    $ref: '#/components/schemas/User'
+
+  /update-profile:
+    put:
+      tags:
+        - Authentication
+      summary: Update user profile
+      description: Update user profile information
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Profile updated successfully"
+                  user:
+                    $ref: '#/components/schemas/User'
+
+  /upload-image:
+    post:
+      tags:
+        - Images
+      summary: Upload images
+      description: Upload multiple images for property ads
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                images:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Array of image files (jpg, jpeg, png)
+      responses:
+        '200':
+          description: Images uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  images:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UploadedImage'
+        '400':
+          description: No files uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /remove-image:
+    delete:
+      tags:
+        - Images
+      summary: Remove image
+      description: Delete an uploaded image from Cloudinary
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                publicId:
+                  type: string
+                  example: "uploads/user_id/image_id"
+              required:
+                - publicId
+      responses:
+        '200':
+          description: Image deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Public ID required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /create-ad:
+    post:
+      tags:
+        - Advertisements
+      summary: Create advertisement
+      description: Create a new property advertisement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAdRequest'
+      responses:
+        '201':
+          description: Ad created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Ad created successfully"
+                  ad:
+                    $ref: '#/components/schemas/Ad'
+                  user:
+                    $ref: '#/components/schemas/User'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /get-ad/{slug}:
+    get:
+      tags:
+        - Advertisements
+      summary: Get advertisement by slug
+      description: Retrieve detailed information about a specific ad and related ads
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          description: Unique slug identifier for the ad
+          schema:
+            type: string
+            example: "house-for-sale-address-123-main-st-at-price-500000-abc123-1234567890"
+      responses:
+        '200':
+          description: Ad retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Related Ad found successfully"
+                  ad:
+                    $ref: '#/components/schemas/AdDetailed'
+                  related:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AdSummary'
+        '404':
+          description: Ad not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /get-ad-sale/{page}:
+    get:
+      tags:
+        - Advertisements
+      summary: Get ads for sale
+      description: Retrieve paginated list of properties for sale
+      parameters:
+        - name: page
+          in: path
+          required: true
+          description: Page number
+          schema:
+            type: integer
+            minimum: 1
+            example: 1
+      responses:
+        '200':
+          description: Ads retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAdsResponse'
+        '400':
+          description: Invalid page number
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /get-ad-rent/{page}:
+    get:
+      tags:
+        - Advertisements
+      summary: Get ads for rent
+      description: Retrieve paginated list of properties for rent
+      parameters:
+        - name: page
+          in: path
+          required: true
+          description: Page number
+          schema:
+            type: integer
+            minimum: 1
+            example: 1
+      responses:
+        '200':
+          description: Ads retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAdsResponse'
+
+  /update-ad/{slug}:
+    put:
+      tags:
+        - Advertisements
+      summary: Update advertisement
+      description: Update an existing property ad (owner only)
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          description: Unique slug identifier for the ad
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAdRequest'
+      responses:
+        '201':
+          description: Ad updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Ad updated successfully"
+                  updatedAd:
+                    $ref: '#/components/schemas/Ad'
+                  user:
+                    $ref: '#/components/schemas/User'
+        '404':
+          description: Ad not found or unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /delete-ad/{slug}:
+    delete:
+      tags:
+        - Advertisements
+      summary: Delete advertisement
+      description: Delete a property ad (owner only)
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          description: Unique slug identifier for the ad
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Ad deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '403':
+          description: Unauthorized to delete
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /user-ads/{page}:
+    get:
+      tags:
+        - Advertisements
+      summary: Get user's ads
+      description: Retrieve paginated list of current user's property ads
+      parameters:
+        - name: page
+          in: path
+          required: true
+          description: Page number
+          schema:
+            type: integer
+            minimum: 1
+            example: 1
+      responses:
+        '200':
+          description: User ads retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAdsResponse'
+
+  /update-ad-status/{slug}:
+    put:
+      tags:
+        - Advertisements
+      summary: Update ad status
+      description: Update the status of a property ad (owner only)
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          description: Unique slug identifier for the ad
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [In Market, Deposit Taken, Under Offer, Sold, Contact agent, Rented, Off Market]
+                  example: "Sold"
+              required:
+                - status
+      responses:
+        '200':
+          description: Ad status updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Ad status updated successfully"
+                  ad:
+                    $ref: '#/components/schemas/Ad'
+
+  /contact-agent:
+    post:
+      tags:
+        - User Interactions
+      summary: Contact property agent
+      description: Send a message to the property owner/agent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                adId:
+                  type: string
+                  example: "60f7b1234567890abcdef123"
+                message:
+                  type: string
+                  example: "I'm interested in this property. Can we schedule a viewing?"
+              required:
+                - adId
+                - message
+      responses:
+        '200':
+          description: Message sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Contact message sent to agent successfully"
+                  link:
+                    type: string
+                    example: "http://localhost:8000/api/get-ad/property-slug"
+        '400':
+          description: Invalid request or cannot contact yourself
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /enquired-ads/{page}:
+    get:
+      tags:
+        - User Interactions
+      summary: Get enquired ads
+      description: Retrieve paginated list of ads the user has enquired about
+      parameters:
+        - name: page
+          in: path
+          required: true
+          description: Page number
+          schema:
+            type: integer
+            minimum: 1
+            example: 1
+      responses:
+        '200':
+          description: Enquired ads retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAdsResponse'
+
+  /toggle-wishlist/{adId}:
+    put:
+      tags:
+        - User Interactions
+      summary: Toggle wishlist
+      description: Add or remove an ad from user's wishlist
+      parameters:
+        - name: adId
+          in: path
+          required: true
+          description: ID of the ad to toggle
+          schema:
+            type: string
+            example: "60f7b1234567890abcdef123"
+      responses:
+        '200':
+          description: Wishlist updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Ad added to wishlist"
+                  wishlist:
+                    type: array
+                    items:
+                      type: string
+                    example: ["60f7b1234567890abcdef123", "60f7b1234567890abcdef456"]
+
+  /wishlist/{page}:
+    get:
+      tags:
+        - User Interactions
+      summary: Get wishlist
+      description: Retrieve paginated list of user's wishlisted properties
+      parameters:
+        - name: page
+          in: path
+          required: true
+          description: Page number
+          schema:
+            type: integer
+            minimum: 1
+            example: 1
+      responses:
+        '200':
+          description: Wishlist retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAdsResponse'
+
+  /search-ads:
+    post:
+      tags:
+        - Search
+      summary: Search advertisements
+      description: Search for properties based on various criteria within geographic radius
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchRequest'
+      responses:
+        '200':
+          description: Search results retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAdsResponse'
+        '400':
+          description: Address is required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: No matching ads found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /toggle-published/{adId}:
+    put:
+      tags:
+        - Admin
+      summary: Toggle published status (Admin)
+      description: Toggle the published status of any ad (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: adId
+          in: path
+          required: true
+          description: ID of the ad to toggle
+          schema:
+            type: string
+            example: "60f7b1234567890abcdef123"
+      responses:
+        '200':
+          description: Published status toggled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Ad Published"
+                  ad:
+                    $ref: '#/components/schemas/Ad'
+        '403':
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token for authentication
+
+  schemas:
+    User:
+      type: object
+      properties:
+        _id:
+          type: string
+          example: "60f7b1234567890abcdef123"
+        username:
+          type: string
+          example: "john_doe"
+        name:
+          type: string
+          example: "john doe"
+        email:
+          type: string
+          format: email
+          example: "john@example.com"
+        address:
+          type: string
+          example: "123 Main St, City, State"
+        phone:
+          type: string
+          example: "+1234567890"
+        role:
+          type: array
+          items:
+            type: string
+            enum: [Buyer, Seller, Admin, Author]
+          example: ["Buyer", "Seller"]
+        photo:
+          type: object
+        logo:
+          type: object
+        company:
+          type: string
+          example: "Real Estate Co"
+        enquiredProperties:
+          type: array
+          items:
+            type: string
+        wishlist:
+          type: array
+          items:
+            type: string
+        about:
+          type: string
+          example: "Experienced real estate agent"
+
+    Ad:
+      type: object
+      properties:
+        _id:
+          type: string
+          example: "60f7b1234567890abcdef456"
+        address:
+          type: string
+          example: "123 Property St, City, State"
+        title:
+          type: string
+          example: "Beautiful Family Home"
+        slug:
+          type: string
+          example: "house-for-sale-address-123-property-st-at-price-500000-abc123-1234567890"
+        price:
+          type: string
+          example: "500000"
+        description:
+          type: string
+          example: "Beautiful 3 bedroom house with modern amenities"
+        propertyType:
+          type: string
+          enum: [House, Apartment, Land, Townhouse]
+          example: "House"
+        action:
+          type: string
+          enum: [Sale, Rent]
+          example: "Sale"
+        bedrooms:
+          type: integer
+          example: 3
+        bathrooms:
+          type: integer
+          example: 2
+        carpark:
+          type: integer
+          example: 2
+        landSize:
+          type: number
+          example: 500
+        landSizeType:
+          type: string
+          example: "sqm"
+        photos:
+          type: array
+          items:
+            type: object
+            properties:
+              url:
+                type: string
+                example: "https://cloudinary.com/image1.jpg"
+              publicId:
+                type: string
+                example: "uploads/user_id/image_id"
+        features:
+          type: object
+          example:
+            airConditioning: true
+            pool: true
+            garden: true
+        nearby:
+          type: object
+          example:
+            schools: ["ABC School"]
+            shopping: ["Mall XYZ"]
+            transport: ["Bus Stop"]
+        location:
+          type: object
+          properties:
+            type:
+              type: string
+              example: "Point"
+            coordinates:
+              type: array
+              items:
+                type: number
+              example: [151.2093, -33.8688]
+        postedBy:
+          type: string
+          example: "60f7b1234567890abcdef123"
+        published:
+          type: boolean
+          example: true
+        status:
+          type: string
+          enum: [In Market, Deposit Taken, Under Offer, Sold, Contact agent, Rented, Off Market]
+          example: "In Market"
+        views:
+          type: integer
+          example: 45
+        createdAt:
+          type: string
+          format: date-time
+          example: "2024-01-01T00:00:00.000Z"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2024-01-02T00:00:00.000Z"
+
+    AdDetailed:
+      allOf:
+        - $ref: '#/components/schemas/Ad'
+        - type: object
+          properties:
+            postedBy:
+              type: object
+              properties:
+                _id:
+                  type: string
+                name:
+                  type: string
+                username:
+                  type: string
+                email:
+                  type: string
+                role:
+                  type: array
+                  items:
+                    type: string
+                phone:
+                  type: string
+                company:
+                  type: string
+                logo:
+                  type: object
+
+    AdSummary:
+      type: object
+      properties:
+        _id:
+          type: string
+        title:
+          type: string
+        price:
+          type: string
+        address:
+          type: string
+        propertyType:
+          type: string
+        action:
+          type: string
+        bedrooms:
+          type: integer
+        bathrooms:
+          type: integer
+        photos:
+          type: array
+          items:
+            type: object
+        distance:
+          type: number
+          description: Distance in meters (for related ads)
+        postedBy:
+          type: object
+          properties:
+            name:
+              type: string
+            email:
+              type: string
+
+    RegisterRequest:
+      type: object
+      required:
+        - username
+        - name
+        - email
+        - password
+        - phone
+      properties:
+        username:
+          type: string
+          example: "john_doe"
+        name:
+          type: string
+          example: "John Doe"
+        email:
+          type: string
+          format: email
+          example: "john@example.com"
+        password:
+          type: string
+          minLength: 6
+          example: "password123"
+        phone:
+          type: string
+          example: "+1234567890"
+        address:
+          type: string
+          example: "123 Main St"
+        role:
+          type: array
+          items:
+            type: string
+            enum: [Buyer, Seller, Admin, Author]
+          example: ["Buyer"]
+        logo:
+          type: string
+          format: uri
+          example: "https://example.com/logo.png"
+        photo:
+          type: string
+          format: uri
+          example: "https://example.com/photo.jpg"
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: "john@example.com"
+        password:
+          type: string
+          example: "password123"
+
+    UpdateProfileRequest:
+      type: object
+      required:
+        - name
+        - address
+        - phone
+      properties:
+        name:
+          type: string
+          example: "John Smith"
+        email:
+          type: string
+          format: email
+          example: "johnsmith@example.com"
+        address:
+          type: string
+          example: "456 New St"
+        phone:
+          type: string
+          example: "+1987654321"
+        company:
+          type: string
+          maxLength: 50
+          example: "Real Estate Co"
+        photo:
+          type: string
+          format: uri
+          pattern: "^https?://.+\\.(jpg|jpeg|png|gif)$"
+          example: "https://example.com/photo.jpg"
+        logo:
+          type: string
+          format: uri
+          pattern: "^https?://.+\\.(jpg|jpeg|png|gif|svg)$"
+          example: "https://example.com/logo.png"
+
+    CreateAdRequest:
+      type: object
+      required:
+        - address
+        - photos
+        - description
+        - propertyType
+        - price
+        - action
+        - bedrooms
+        - bathrooms
+        - carpark
+        - title
+        - features
+        - nearBy
+        - published
+        - views
+        - status
+      properties:
+        address:
+          type: string
+          maxLength: 100
+          example: "123 Property St, City, State"
+        photos:
+          type: array
+          items:
+            type: object
+            properties:
+              url:
+                type: string
+              publicId:
+                type: string
+          minItems: 1
+        description:
+          type: string
+          maxLength: 5000
+          example: "Beautiful 3 bedroom house with modern amenities"
+        propertyType:
+          type: string
+          enum: [House, Apartment, Land, Townhouse]
+          example: "House"
+        price:
+          type: string
+          maxLength: 100
+          example: "500000"
+        landsize:
+          type: string
+          description: "Required if propertyType is 'Land'"
+          example: "500"
+        landsizeType:
+          type: string
+          description: "Required if propertyType is 'Land'"
+          example: "sqm"
+        action:
+          type: string
+          enum: [Sale, Rent]
+          example: "Sale"
+        bedrooms:
+          type: integer
+          minimum: 0
+          example: 3
+        bathrooms:
+          type: integer
+          minimum: 0
+          example: 2
+        carpark:
+          type: integer
+          minimum: 0
+          example: 2
+        title:
+          type: string
+          maxLength: 100
+          example: "Beautiful Family Home"
+        features:
+          type: object
+          example:
+            airConditioning: true
+            pool: true
+            garden: true
+        nearBy:
+          type: object
+          example:
+            schools: ["ABC School"]
+            shopping: ["Mall XYZ"]
+            transport: ["Bus Stop"]
+        published:
+          type: boolean
+          example: true
+        views:
+          type: integer
+          minimum: 0
+          example: 0
+        status:
+          type: string
+          enum: [In Market, Deposit Taken, Under Offer, Sold, Contact agent, Rented, Off Market]
+          example: "In Market"
+
+    SearchRequest:
+      type: object
+      required:
+        - address
+      properties:
+        address:
+          type: string
+          example: "Sydney, NSW"
+          description: "Address to search around (10km radius)"
+        price:
+          type: string
+          example: "500000"
+          description: "Target price (searches ±20% range)"
+        page:
+          type: integer
+          minimum: 1
+          default: 1
+          example: 1
+        action:
+          type: string
+          enum: [Sale, Rent]
+          example: "Sale"
+        propertyType:
+          type: string
+          enum: [House, Apartment, Land, Townhouse, All]
+          example: "House"
+        bedrooms:
+          oneOf:
+            - type: integer
+              minimum: 0
+            - type: string
+              enum: [All]
+          example: 3
+        bathrooms:
+          oneOf:
+            - type: integer
+              minimum: 0
+            - type: string
+              enum: [All]
+          example: 2
+
+    UploadedImage:
+      type: object
+      properties:
+        userId:
+          type: string
+          example: "60f7b1234567890abcdef123"
+        url:
+          type: string
+          format: uri
+          example: "https://res.cloudinary.com/demo/image/upload/sample.jpg"
+        publicId:
+          type: string
+          example: "uploads/user_id/image_id"
+
+    PaginatedAdsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Ads fetched successfully"
+        ads:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdSummary'
+        totalAds:
+          type: integer
+          example: 25
+        totalPages:
+          type: integer
+          example: 13
+        currentPage:
+          type: integer
+          example: 1
+
+    AuthResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Login successful"
+        user:
+          $ref: '#/components/schemas/User'
+        token:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Operation completed successfully"
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: "Error description"
+        error:
+          type: string
+          example: "Detailed error message"
+
+tags:
+  - name: Health Check
+    description: API health and status endpoints
+  - name: Authentication
+    description: User authentication and profile management
+  - name: Images
+    description: Image upload and management
+  - name: Advertisements
+    description: Property advertisement CRUD operations
+  - name: User Interactions
+    description: Wishlist, enquiries, and agent contact
+  - name: Search
+    description: Property search functionality
+  - name: Admin
+    description: Administrative operations
