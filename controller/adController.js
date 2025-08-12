@@ -244,6 +244,13 @@ export const readAdSell = async (req, res) => {
     if (!ads || ads.length === 0) {
       return res.status(404).json({ success: false, message: 'No ads found for sale' });
     }
+
+    for (const ad of ads) {
+      incrementViewCount(ad._id);
+    }
+
+    ads.save();
+
     res.status(200).json({
       success: true,
       message: 'Ads for sale fetched successfully',
@@ -280,6 +287,13 @@ export const readAdRent = async (req, res) => {
     if (!ads || ads.length === 0) {
       return res.status(404).json({ success: false, message: 'No ads found for sale' });
     }
+
+    for (const ad of ads) {
+      incrementViewCount(ad._id);
+    }
+
+    ads.save();
+
     res.status(200).json({
       success: true,
       message: 'Ads for sale fetched successfully',
